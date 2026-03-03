@@ -24,7 +24,7 @@ func main() {
 		log.Fatal("filter IP is required: -filter <IP_ADDRESS>")
 	}
 
-	// connect to analyzer
+	// connect to analyzer on a <analyzerAddr>
 	conn, err := net.Dial("tcp", *analyzerAddr)
 	if err != nil {
 		log.Fatalf("failed to connect to analyzer: %v", err)
@@ -39,16 +39,17 @@ func main() {
 
 	// set BPF filter
 	filter := fmt.Sprintf("host %s", *host)
-	if err := handle.SetBPFFilter(bpf); err != nil {
+	if err := handle.SetBPFFilter(filter); err != nil {
 		log.Fatalf("failed to set BPF filter: %v", err)
 	}
 
 	fmt.Printf("Collecting packets from %s, filter: %s\n", *iface, *host)
 
 	encoder := json.NewEncoder(conn)
+	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 
-	for packet := range packetSource.Packets() {
-		info := extractPacketInfo(packet)
+	for p := range packetSource.Packets() {
+		info := extractPacketInfo(p)
 		if info == nil {
 			continue
 		}
@@ -59,20 +60,34 @@ func main() {
 	}
 }
 
-func extractPacketInfo(packet gopacket.Packet) *packet.PacketFeatures {
-	var info packet.PacketFeatures
+func extractPacketInfo(p gopacket.Packet) *packet.PacketFeatures {
+	info := packet.PacketFeatures{}
 
 	// get ip layer
-	ipLayer := packet.Layer(layers.LayerTypeIPv4)
+	ipLayer := p.Layer(layers.LayerTypeIPv4)
 	if ipLayer == nil {
 		return nil
 	}
 
 	ip, _ := ipLayer.(*layers.IPv4)
-	info.SrcIP := ip.SrcIP.String()
-	info.DstIP := ip.DstIP.String()
-	info.Length := len(packet.Data())
+	info.SrcIP = ip.SrcIP.String()
+	info.DstIP = ip.DstIP.String()
+	info.Length = len(p.Data())
 
 	// get transport layer
+	if tcpLayer := p.Layer(layers.LayerTypeTCP); tcpLayer != nil {
+		tcp, _ := tcpLayer.(*layers.TCP)
+		info.SrcPort = uint16(tcp.SrcPort)
+		info.DstPort = uint16(tcp.DstPort)
+		info.Protocol = "TCP"
+	} else if udpLayer := p.Layer(layers.LayerTypeUDP); udpLayer != nil {
+		udp, _ := udpLayer.(*layers.UDP)
+		info.SrcPort = uint16(udp.SrcPort)
+		info.DstPort = uint16(udp.DstPort)
+		info.Protocol = "UDP"
+	} else {
+		info.Protocol = "OTHER"
+	}
 
+	return &info
 }
