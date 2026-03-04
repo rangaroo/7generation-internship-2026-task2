@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -26,28 +27,38 @@ func main() {
 		}
 	*/
 
+	for {
+		if err := runSniffer(*iface, *host, *analyzerAddr); err != nil {
+			log.Printf("disconnected: %v, reconnecting in 3s...")
+			time.Sleep(3 * time.Second)
+		}
+	}
+}
+
+func runSniffer(iface, host, analyzerAddr string) error {
 	// connect to analyzer on a <analyzerAddr>
-	conn, err := net.Dial("tcp", *analyzerAddr)
+	conn, err := net.Dial("tcp", analyzerAddr)
 	if err != nil {
-		log.Fatalf("failed to connect to analyzer: %v", err)
+		return fmt.Errorf("failed to connect to analyzer: %v", err)
 	}
 	defer conn.Close()
 
 	// open pcap handle
-	handle, err := pcap.OpenLive(*iface, 65536, true, pcap.BlockForever)
+	handle, err := pcap.OpenLive(iface, 65536, true, pcap.BlockForever)
 	if err != nil {
-		log.Fatalf("failed to open interface: %v", err)
+		return fmt.Errorf("failed to open interface: %v", err)
 	}
+	defer handle.Close()
 
-	if *host != "" {
+	if host != "" {
 		// set BPF filter
-		filter := fmt.Sprintf("host %s", *host)
+		filter := fmt.Sprintf("host %s", host)
 		if err := handle.SetBPFFilter(filter); err != nil {
-			log.Fatalf("failed to set BPF filter: %v", err)
+			return fmt.Errorf("failed to set BPF filter: %v", err)
 		}
 	}
 
-	fmt.Printf("Collecting packets from %s, filter: %s\n", *iface, *host)
+	fmt.Printf("Collecting packets from %s, filter: %s\n", iface, host)
 
 	encoder := json.NewEncoder(conn)
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
@@ -59,9 +70,11 @@ func main() {
 		}
 
 		if err := encoder.Encode(info); err != nil {
-			log.Printf("failed to send packet info: %v", err)
+			return fmt.Errorf("failed to send packet info: %v", err)
 		}
 	}
+
+	return nil
 }
 
 func extractPacketInfo(p gopacket.Packet) *packet.PacketFeatures {

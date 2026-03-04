@@ -17,3 +17,31 @@
 адрес с самым большим числом байтов.
 Программа должна работать в командной строке. Язык реализации Go или C. Возможно
 использование фреймворков DPDK или библиотеки libpcap, но выбор остаётся за решающим
+
+## Solution
+
+### Usage
+#### Build the analyzer and sniffer executables
+```
+go build -o sniffer cmd/sniffer/main.go
+go build -o analyzer cmd/analyzer/main.go
+```
+
+#### Analyzer
+Start the analyzer first (listens on ports 9000 and 8080):
+```
+./analyzer
+```
+
+The ananlyzer will:
+* Listen for TCP connections from sniffers on port 9000
+* Serve HTTP API on port 8080 at /stats endpoint
+* Print top bytes and packets IPs statistics periodically on cmd
+
+#### Sniffer 
+Start the sniffer on another terminal:
+```
+sudo ./sniffer -i <network_interface> -ip <filter_ip> -addr localhost:9000
+````
+
+You can also omit -ip flag. It is equivalent to collecting stats from all IPs.
