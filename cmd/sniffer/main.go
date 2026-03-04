@@ -20,9 +20,11 @@ func main() {
 
 	flag.Parse()
 
-	if *host == "" {
-		log.Fatal("filter IP is required: -filter <IP_ADDRESS>")
-	}
+	/*
+		if *host == "" {
+			log.Fatal("filter IP is required: -ip <IP_ADDRESS>")
+		}
+	*/
 
 	// connect to analyzer on a <analyzerAddr>
 	conn, err := net.Dial("tcp", *analyzerAddr)
@@ -37,10 +39,12 @@ func main() {
 		log.Fatalf("failed to open interface: %v", err)
 	}
 
-	// set BPF filter
-	filter := fmt.Sprintf("host %s", *host)
-	if err := handle.SetBPFFilter(filter); err != nil {
-		log.Fatalf("failed to set BPF filter: %v", err)
+	if *host != "" {
+		// set BPF filter
+		filter := fmt.Sprintf("host %s", *host)
+		if err := handle.SetBPFFilter(filter); err != nil {
+			log.Fatalf("failed to set BPF filter: %v", err)
+		}
 	}
 
 	fmt.Printf("Collecting packets from %s, filter: %s\n", *iface, *host)
