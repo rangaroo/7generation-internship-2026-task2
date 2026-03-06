@@ -42,6 +42,37 @@ The ananlyzer will:
 Start the sniffer on another terminal:
 ```
 sudo ./sniffer -i <network_interface> -ip <filter_ip> -addr localhost:9000
-````
+```
 
+If you want to listen to all interfaces, you can pass `any` for -i flag.
 You can also omit -ip flag. It is equivalent to collecting stats from all IPs.
+
+### Testing the Program
+
+To generate network traffic and see the sniffer/analyzer in action, you can use these commands in a separate terminal:
+
+#### Generate HTTP traffic to specific IPs
+
+* Run the analyzer
+* Run the sniffer without an IP filter
+
+```bash
+# Generate traffic to Google DNS (8.8.8.8)
+curl -I http://8.8.8.8
+
+# Generate traffic to Cloudflare DNS (1.1.1.1)
+curl -I http://1.1.1.1
+
+# Ping to generate ICMP packets
+ping -c 10 8.8.8.8
+```
+
+#### View statistics via HTTP API
+```bash
+# Get current statistics
+curl http://localhost:8080/stats
+```
+
+The analyzer will print periodic statistics to the console showing:
+- IP address with the most packets
+- IP address with the most bytes
